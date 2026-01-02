@@ -14,7 +14,7 @@
 [[nodiscard]] static bool isVideoFile(const std::string& path) {
     static constexpr std::array exts{".mp4", ".mkv", ".webm", ".av1", ".mov", ".avi"};
 
-    auto ext = std::filesystem::path(path).extension().string();
+    auto                        ext = std::filesystem::path(path).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     return std::ranges::any_of(exts, [&ext](const auto& e) { return ext == e; });
 }
@@ -70,7 +70,7 @@ CWallpaperTarget::CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoo
     m_null = Hyprtoolkit::CNullBuilder::begin()->size({Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, {1, 1}})->commence();
 
     const bool isVideo = isVideoFile(path.front());
-    m_isVideo = isVideo && Hyprtoolkit::videoSupported();
+    m_isVideo          = isVideo && Hyprtoolkit::videoSupported();
 
     g_logger->log(LOG_DEBUG, "Wallpaper path='{}' isVideoFile={} videoSupported={} m_isVideo={}", path.front(), isVideo, Hyprtoolkit::videoSupported(), m_isVideo);
 
@@ -104,8 +104,8 @@ CWallpaperTarget::CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoo
 
         if (path.size() > 1) {
             m_imagesData = makeUnique<CImagesData>(fitMode, path, timeout);
-            m_timer =
-                m_backend->addTimer(std::chrono::milliseconds(std::chrono::seconds(m_imagesData->timeout)), [this](ASP<Hyprtoolkit::CTimer> self, void*) { onRepeatTimer(); }, nullptr);
+            m_timer      = m_backend->addTimer(
+                std::chrono::milliseconds(std::chrono::seconds(m_imagesData->timeout)), [this](ASP<Hyprtoolkit::CTimer> self, void*) { onRepeatTimer(); }, nullptr);
         }
     }
 
