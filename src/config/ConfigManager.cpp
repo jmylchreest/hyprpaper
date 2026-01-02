@@ -37,6 +37,30 @@ using namespace std::string_literals;
     return std::string(result).starts_with("image/");
 }
 
+[[nodiscard]] static bool isVideo(const std::filesystem::path& path) {
+    static constexpr std::array exts{".mp4", ".mkv", ".webm", ".av1", ".mov", ".avi"};
+
+    auto                        ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    if (std::ranges::any_of(exts, [&ext](const auto& e) { return ext == e; }))
+        return true;
+
+    magic_t magic = magic_open(MAGIC_MIME_TYPE);
+    if (magic == nullptr)
+        return false;
+
+    Hyprutils::Utils::CScopeGuard guard{[&magic] { magic_close(magic); }};
+
+    if (magic_load(magic, nullptr) != 0)
+        return false;
+
+    const auto* result = magic_file(magic, path.string().c_str());
+    if (result == nullptr)
+        return false;
+
+    return std::string(result).starts_with("video/");
+}
+
 static std::string getMainConfigPath() {
     static const auto paths = Hyprutils::Path::findConfig("hyprpaper");
 
@@ -117,10 +141,10 @@ static std::expected<std::vector<std::string>, std::string> getFullPath(const st
 
     if (std::filesystem::is_directory(resolvedPath))
         for (const auto& entry : std::filesystem::directory_iterator(resolvedPath, std::filesystem::directory_options::skip_permission_denied)) {
-            if (entry.is_regular_file() && isImage(entry.path())) 
+            if (entry.is_regular_file() && isImage(entry.path()))
                 result.push_back(entry.path());
 
-            if (result.size() >= maxImagesCount) 
+            if (result.size() >= maxImagesCount)
                 break;
         }
     else if (isImage(resolvedPath))
