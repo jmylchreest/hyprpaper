@@ -16,8 +16,9 @@ class CConfigManager {
     struct SSetting {
         std::string              monitor, fitMode;
         std::vector<std::string> paths;
-        int                      timeout = 0;
-        uint32_t                 id      = 0;
+        int                      timeout  = 0;
+        int                      videoFps = 15;
+        uint32_t                 id       = 0;
     };
 
     constexpr static const uint32_t SETTING_INVALID = 0;

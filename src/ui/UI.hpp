@@ -8,6 +8,7 @@
 #include <hyprtoolkit/element/Text.hpp>
 #include <hyprtoolkit/element/Null.hpp>
 #include <hyprtoolkit/element/Image.hpp>
+#include <hyprtoolkit/element/Video.hpp>
 #include <hyprtoolkit/element/Rectangle.hpp>
 
 #include <hyprutils/signal/Listener.hpp>
@@ -17,7 +18,7 @@
 class CWallpaperTarget {
   public:
     CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoolkit::IOutput> output, const std::vector<std::string>& path,
-                     Hyprtoolkit::eImageFitMode fitMode = Hyprtoolkit::IMAGE_FIT_MODE_COVER, const int timeout = 0);
+                     Hyprtoolkit::eImageFitMode fitMode = Hyprtoolkit::IMAGE_FIT_MODE_COVER, int timeout = 0, int videoFps = 15);
     ~CWallpaperTarget();
 
     CWallpaperTarget(const CWallpaperTarget&) = delete;
@@ -38,7 +39,9 @@ class CWallpaperTarget {
     SP<Hyprtoolkit::CNullElement>      m_null;
     SP<Hyprtoolkit::CRectangleElement> m_bg;
     SP<Hyprtoolkit::CImageElement>     m_image;
+    SP<Hyprtoolkit::CVideoElement>     m_video;
     SP<Hyprtoolkit::CTextElement>      m_splash;
+    bool                               m_isVideo = false;
 };
 
 class CUI {

@@ -83,6 +83,7 @@ void CConfigManager::init() {
     m_config.addSpecialConfigValue("wallpaper", "path", Hyprlang::STRING{""});
     m_config.addSpecialConfigValue("wallpaper", "fit_mode", Hyprlang::STRING{"cover"});
     m_config.addSpecialConfigValue("wallpaper", "timeout", Hyprlang::INT{0});
+    m_config.addSpecialConfigValue("wallpaper", "video_fps", Hyprlang::INT{0});
 
     m_config.commence();
 
@@ -141,16 +142,16 @@ static std::expected<std::vector<std::string>, std::string> getFullPath(const st
 
     if (std::filesystem::is_directory(resolvedPath))
         for (const auto& entry : std::filesystem::directory_iterator(resolvedPath, std::filesystem::directory_options::skip_permission_denied)) {
-            if (entry.is_regular_file() && isImage(entry.path()))
+            if (entry.is_regular_file() && (isImage(entry.path()) || isVideo(entry.path())))
                 result.push_back(entry.path());
 
             if (result.size() >= maxImagesCount)
                 break;
         }
-    else if (isImage(resolvedPath))
+    else if (isImage(resolvedPath) || isVideo(resolvedPath))
         result.push_back(resolvedPath);
     else
-        return std::unexpected(std::format("File '{}' is neither an image nor a directory", resolvedPath));
+        return std::unexpected(std::format("File '{}' is neither an image, video, nor a directory", resolvedPath));
 
     return result;
 }
@@ -163,13 +164,14 @@ std::vector<CConfigManager::SSetting> CConfigManager::getSettings() {
 
     for (auto& key : keys) {
         std::string monitor, fitMode, path;
-        int         timeout;
+        int         timeout, videoFps;
 
         try {
-            monitor = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "monitor", key.c_str()));
-            fitMode = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "fit_mode", key.c_str()));
-            path    = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "path", key.c_str()));
-            timeout = std::any_cast<Hyprlang::INT>(m_config.getSpecialConfigValue("wallpaper", "timeout", key.c_str()));
+            monitor  = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "monitor", key.c_str()));
+            fitMode  = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "fit_mode", key.c_str()));
+            path     = std::any_cast<Hyprlang::STRING>(m_config.getSpecialConfigValue("wallpaper", "path", key.c_str()));
+            timeout  = std::any_cast<Hyprlang::INT>(m_config.getSpecialConfigValue("wallpaper", "timeout", key.c_str()));
+            videoFps = std::any_cast<Hyprlang::INT>(m_config.getSpecialConfigValue("wallpaper", "video_fps", key.c_str()));
         } catch (...) {
             g_logger->log(LOG_ERR, "Failed parsing wallpaper for key {}", key);
             continue;
@@ -187,7 +189,7 @@ std::vector<CConfigManager::SSetting> CConfigManager::getSettings() {
             continue;
         }
 
-        result.emplace_back(SSetting{.monitor = std::move(monitor), .fitMode = std::move(fitMode), .paths = RESOLVE_PATH.value(), .timeout = timeout});
+        result.emplace_back(SSetting{.monitor = std::move(monitor), .fitMode = std::move(fitMode), .paths = RESOLVE_PATH.value(), .timeout = timeout, .videoFps = videoFps});
     }
 
     return result;

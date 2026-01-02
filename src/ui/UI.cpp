@@ -7,6 +7,18 @@
 
 #include <hyprtoolkit/core/Output.hpp>
 
+#include <algorithm>
+#include <array>
+#include <filesystem>
+
+[[nodiscard]] static bool isVideoFile(const std::string& path) {
+    static constexpr std::array exts{".mp4", ".mkv", ".webm", ".av1", ".mov", ".avi"};
+
+    auto ext = std::filesystem::path(path).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return std::ranges::any_of(exts, [&ext](const auto& e) { return ext == e; });
+}
+
 CUI::CUI() = default;
 
 CUI::~CUI() {
@@ -32,7 +44,7 @@ class CWallpaperTarget::CImagesData {
 };
 
 CWallpaperTarget::CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoolkit::IOutput> output, const std::vector<std::string>& path, Hyprtoolkit::eImageFitMode fitMode,
-                                   const int timeout) : m_monitorName(output->port()), m_backend(backend) {
+                                   int timeout, int videoFps) : m_monitorName(output->port()), m_backend(backend) {
     static const auto SPLASH_REPLY = HyprlandSocket::getFromSocket("/splash");
 
     static const auto PENABLESPLASH = Hyprlang::CSimpleConfigValue<Hyprlang::INT>(g_config->hyprlang(), "splash");
@@ -57,25 +69,49 @@ CWallpaperTarget::CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoo
                ->commence();
     m_null = Hyprtoolkit::CNullBuilder::begin()->size({Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, {1, 1}})->commence();
 
-    m_image = Hyprtoolkit::CImageBuilder::begin()
-                  ->path(std::string{path.front()})
-                  ->size({Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, {1.F, 1.F}})
-                  ->sync(true)
-                  ->fitMode(fitMode)
-                  ->commence();
+    const bool isVideo = isVideoFile(path.front());
+    m_isVideo = isVideo && Hyprtoolkit::videoSupported();
 
-    m_image->setPositionMode(Hyprtoolkit::IElement::HT_POSITION_ABSOLUTE);
-    m_image->setPositionFlag(Hyprtoolkit::IElement::HT_POSITION_FLAG_CENTER, true);
+    g_logger->log(LOG_DEBUG, "Wallpaper path='{}' isVideoFile={} videoSupported={} m_isVideo={}", path.front(), isVideo, Hyprtoolkit::videoSupported(), m_isVideo);
 
-    if (path.size() > 1) {
-        m_imagesData = makeUnique<CImagesData>(fitMode, path, timeout);
-        m_timer =
-            m_backend->addTimer(std::chrono::milliseconds(std::chrono::seconds(m_imagesData->timeout)), [this](ASP<Hyprtoolkit::CTimer> self, void*) { onRepeatTimer(); }, nullptr);
+    if (isVideo && !m_isVideo) {
+        g_logger->log(LOG_ERR, "Video wallpaper '{}' requested but video playback not supported (FFmpeg unavailable)", path.front());
+        return;
+    }
+
+    if (m_isVideo) {
+        g_logger->log(LOG_DEBUG, "Creating video wallpaper element for '{}'", path.front());
+        m_video = Hyprtoolkit::CVideoBuilder::begin()
+                      ->path(std::string{path.front()})
+                      ->size({Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, {1.F, 1.F}})
+                      ->fitMode(fitMode)
+                      ->fps(videoFps)
+                      ->loop(true)
+                      ->commence();
+
+        m_video->setPositionMode(Hyprtoolkit::IElement::HT_POSITION_ABSOLUTE);
+        m_video->setPositionFlag(Hyprtoolkit::IElement::HT_POSITION_FLAG_CENTER, true);
+    } else {
+        m_image = Hyprtoolkit::CImageBuilder::begin()
+                      ->path(std::string{path.front()})
+                      ->size({Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, Hyprtoolkit::CDynamicSize::HT_SIZE_PERCENT, {1.F, 1.F}})
+                      ->sync(true)
+                      ->fitMode(fitMode)
+                      ->commence();
+
+        m_image->setPositionMode(Hyprtoolkit::IElement::HT_POSITION_ABSOLUTE);
+        m_image->setPositionFlag(Hyprtoolkit::IElement::HT_POSITION_FLAG_CENTER, true);
+
+        if (path.size() > 1) {
+            m_imagesData = makeUnique<CImagesData>(fitMode, path, timeout);
+            m_timer =
+                m_backend->addTimer(std::chrono::milliseconds(std::chrono::seconds(m_imagesData->timeout)), [this](ASP<Hyprtoolkit::CTimer> self, void*) { onRepeatTimer(); }, nullptr);
+        }
     }
 
     m_window->m_rootElement->addChild(m_bg);
     m_window->m_rootElement->addChild(m_null);
-    m_null->addChild(m_image);
+    m_null->addChild(m_isVideo ? SP<Hyprtoolkit::IElement>(m_video) : SP<Hyprtoolkit::IElement>(m_image));
 
     if (!SPLASH_REPLY)
         g_logger->log(LOG_ERR, "Can't get splash: {}", SPLASH_REPLY.error());
@@ -100,6 +136,8 @@ CWallpaperTarget::CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoo
 CWallpaperTarget::~CWallpaperTarget() {
     if (m_timer && !m_timer->passed())
         m_timer->cancel();
+    if (m_video)
+        m_video->pause();
 }
 
 void CWallpaperTarget::onRepeatTimer() {
@@ -207,5 +245,7 @@ void CUI::targetChanged(const SP<Hyprtoolkit::IOutput>& mon) {
 
     std::erase_if(m_targets, [&mon](const auto& e) { return e->m_monitorName == mon->port(); });
 
-    m_targets.emplace_back(makeShared<CWallpaperTarget>(m_backend, mon, TARGET->get().paths, toFitMode(TARGET->get().fitMode), TARGET->get().timeout));
+    g_logger->log(LOG_DEBUG, "Creating CWallpaperTarget for {} with {} paths, first path='{}'", mon->port(), TARGET->get().paths.size(),
+                  TARGET->get().paths.empty() ? "<empty>" : TARGET->get().paths.front());
+    m_targets.emplace_back(makeShared<CWallpaperTarget>(m_backend, mon, TARGET->get().paths, toFitMode(TARGET->get().fitMode), TARGET->get().timeout, TARGET->get().videoFps));
 }
