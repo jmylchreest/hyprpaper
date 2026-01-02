@@ -18,7 +18,7 @@
 class CWallpaperTarget {
   public:
     CWallpaperTarget(SP<Hyprtoolkit::IBackend> backend, SP<Hyprtoolkit::IOutput> output, const std::vector<std::string>& path,
-                     Hyprtoolkit::eImageFitMode fitMode = Hyprtoolkit::IMAGE_FIT_MODE_COVER, int timeout = 0, int videoFps = 15);
+                     Hyprtoolkit::eImageFitMode fitMode = Hyprtoolkit::IMAGE_FIT_MODE_COVER, int timeout = 0, int videoFps = 0, bool isVideo = false);
     ~CWallpaperTarget();
 
     CWallpaperTarget(const CWallpaperTarget&) = delete;

@@ -17,7 +17,8 @@ class CConfigManager {
         std::string              monitor, fitMode;
         std::vector<std::string> paths;
         int                      timeout  = 0;
-        int                      videoFps = 15;
+        int                      videoFps = 0;
+        bool                     isVideo  = false;
         uint32_t                 id       = 0;
     };
 

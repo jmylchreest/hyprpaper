@@ -189,7 +189,9 @@ std::vector<CConfigManager::SSetting> CConfigManager::getSettings() {
             continue;
         }
 
-        result.emplace_back(SSetting{.monitor = std::move(monitor), .fitMode = std::move(fitMode), .paths = RESOLVE_PATH.value(), .timeout = timeout, .videoFps = videoFps});
+        const auto& paths     = RESOLVE_PATH.value();
+        const bool  videoPath = !paths.empty() && isVideo(paths.front());
+        result.emplace_back(SSetting{.monitor = std::move(monitor), .fitMode = std::move(fitMode), .paths = paths, .timeout = timeout, .videoFps = videoFps, .isVideo = videoPath});
     }
 
     return result;
