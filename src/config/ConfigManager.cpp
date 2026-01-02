@@ -38,7 +38,7 @@ using namespace std::string_literals;
 }
 
 [[nodiscard]] static bool isVideo(const std::filesystem::path& path) {
-    static constexpr std::array exts{".mp4", ".mkv", ".webm", ".av1", ".mov", ".avi"};
+    static constexpr std::array exts{".mp4", ".mkv", ".webm", ".mov", ".avi"};
 
     auto                        ext = path.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
